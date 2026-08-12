@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BFS & DFS Maze Analysis</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --wall: #f8fafc;
+      --start: #22c55e;
+      --end: #ef4444;
+      --visit: #22d3ee;
+      --path: #facc15;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, var(--bg) 48%);
+      color: var(--text);
+      padding: 28px 16px;
+    }
+
+    .app {
+      width: min(100%, 1080px);
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .header h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.65rem, 4vw, 2.4rem);
+    }
+
+    .header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .panel {
+      background: rgba(17, 24, 39, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 18px 45px rgba(0,0,0,.28);
+      margin-bottom: 18px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform .15s ease, background .15s ease, opacity .15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .secondary { background: #334155; }
+    .secondary:hover:not(:disabled) { background: #475569; }
+    .danger { background: #b91c1c; }
+    .danger:hover:not(:disabled) { background: #991b1b; }
+
+    .status-row {
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .status-row strong { color: #fff; }
+    .status-row span { color: var(--muted); }
+
+    .maze-wrap {
+      overflow-x: auto;
+      padding: 4px 0 8px;
+    }
+
+    #maze {
+      display: grid;
+      grid-template-columns: repeat(20, 28px);
+      width: max-content;
+      gap: 2px;
+      margin: 0 auto;
+      padding: 10px;
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .cell {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 900;
+      background: #172033;
+      color: #0f172a;
+      user-select: none;
+    }
+
+    .wall { background: var(--wall); }
+    .start { background: var(--start); color: #052e16; }
+    .end { background: var(--end); color: #450a0a; }
+    .visited { background: var(--visit); color: #083344; }
+    .path { background: var(--path); color: #422006; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: .93rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .swatch {
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.25);
+    }
+
+    .result {
+      min-height: 48px;
+      line-height: 1.65;
+      color: #dbeafe;
+    }
+
+    .result h2 {
+      margin: 0 0 10px;
+      font-size: 1.18rem;
+      color: #fff;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+    }
+
+    .metric {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .metric small {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .metric strong { font-size: 1.08rem; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      min-width: 560px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th { color: #fff; }
+    td { color: #cbd5e1; }
+
+    .table-wrap { overflow-x: auto; }
+
+    .note {
+      margin-top: 12px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 16px 10px; }
+      .panel { padding: 14px; }
+      #maze {
+        grid-template-columns: repeat(20, 22px);
+        gap: 1px;
+      }
+      .cell { width: 22px; height: 22px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <h1>BFS & DFS Maze Analysis</h1>
+      <p>Interactive browser version of the original C project</p>
+    </header>
+
+    <section class="panel">
+      <div class="controls">
+        <button id="dfsBtn">Run DFS Visualization</button>
+        <button id="bfsBtn">Run BFS Visualization</button>
+        <button id="compareBtn" class="secondary">Compare BFS vs DFS</button>
+        <button id="unreachableBtn" class="danger">Test Unreachable Target</button>
+        <button id="resetBtn" class="secondary">Reset Maze</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="status-row">
+        <div><strong>Algorithm:</strong> <span id="algorithm">Ready</span></div>
+        <div><strong>Explored nodes:</strong> <span id="nodes">0</span></div>
+      </div>
+
+      <div class="maze-wrap">
+        <div id="maze" aria-label="Maze visualization"></div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="swatch start"></span>S = Start</span>
+        <span class="legend-item"><span class="swatch end"></span>E = End</span>
+        <span class="legend-item"><span class="swatch wall"></span>Wall</span>
+        <span class="legend-item"><span class="swatch visited"></span>Visited</span>
+        <span class="legend-item"><span class="swatch path"></span>Final path</span>
+      </div>
+    </section>
+
+    <section class="panel result" id="result">
+      Choose an option above to start.
+    </section>
+  </main>
+
+  <script>
+    const ROWS = 10;
+    const COLS = 20;
+    const ANIMATION_DELAY_MS = 45;
+
+    const DEFAULT_MAZE = [
+      "S #       #        #",
+      "  #  ###  #  ####  #",
+      "     #    #  #     #",
+      "###  #  ###  #  ####",
+      "  #  #       #     #",
+      "  #  #####   ####  #",
+      "  #          #     #",
+      "  #######    #  ####",
+      "        #    #     E",
+      "#####   #    #######"
+    ];
+
+    const directions = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1]
+    ];
+
+    let maze = [];
+    let visited = [];
+    let parent = [];
+    let running = false;
+
+    const mazeEl = document.getElementById("maze");
+    const algorithmEl = document.getElementById("algorithm");
+    const nodesEl = document.getElementById("nodes");
+    const resultEl = document.getElementById("result");
+    const actionButtons = [
+      document.getElementById("dfsBtn"),
+      document.getElementById("bfsBtn"),
+      document.getElementById("compareBtn"),
+      document.getElementById("unreachableBtn"),
+      document.getElementById("resetBtn")
+    ];
+
+    function resetState() {
+      maze = DEFAULT_MAZE.map(row => row.split(""));
+      visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+      parent = Array.from({ length: ROWS }, () =>
+        Array.from({ length: COLS }, () => null)
+      );
+    }
+
+    function resetSearchOnly() {
+      visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+      parent = Array.from({ length: ROWS }, () =>
+        Array.from({ length: COLS }, () => null)
+      );
+    }
+
+    function findCell(target) {
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (maze[r][c] === target) return { r, c };
+        }
+      }
+      return null;
+    }
+
+    function isInside(r, c) {
+      return r >= 0 && r < ROWS && c >= 0 && c < COLS;
+    }
+
+    function isValid(r, c) {
+      return isInside(r, c) && maze[r][c] !== "#" && !visited[r][c];
+    }
+
+    function samePoint(a, b) {
+      return a.r === b.r && a.c === b.c;
+    }
+
+    function renderMaze() {
+      mazeEl.innerHTML = "";
+      const fragment = document.createDocumentFragment();
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const value = maze[r][c];
+          const cell = document.createElement("div");
+          cell.className = "cell";
+
+          if (value === "#") cell.classList.add("wall");
+          else if (value === "S") {
+            cell.classList.add("start");
+            cell.textContent = "S";
+          } else if (value === "E") {
+            cell.classList.add("end");
+            cell.textContent = "E";
+          } else if (value === ".") {
+            cell.classList.add("visited");
+            cell.textContent = "·";
+          } else if (value === "*") {
+            cell.classList.add("path");
+            cell.textContent = "★";
+          }
+
+          fragment.appendChild(cell);
+        }
+      }
+      mazeEl.appendChild(fragment);
+    }
+
+    function setStatus(algorithm, nodesVisited) {
+      algorithmEl.textContent = algorithm;
+      nodesEl.textContent = nodesVisited;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function setRunning(value) {
+      running = value;
+      actionButtons.forEach(button => button.disabled = value);
+    }
+
+    function reconstructPath(start, end) {
+      if (samePoint(start, end)) return 0;
+
+      let length = 0;
+      let curr = { ...end };
+
+      while (!samePoint(curr, start)) {
+        const p = parent[curr.r][curr.c];
+        if (!p) return -1;
+
+        length++;
+        curr = { ...p };
+
+        if (!samePoint(curr, start) && maze[curr.r][curr.c] !== "E") {
+          maze[curr.r][curr.c] = "*";
+        }
+      }
+
+      return length;
+    }
+
+    async function dfsVisit(r, c, end, metrics, depth, animate) {
+      visited[r][c] = true;
+      metrics.nodesVisited++;
+      metrics.peakStructure = Math.max(metrics.peakStructure, depth);
+
+      if (r === end.r && c === end.c) return true;
+
+      if (maze[r][c] !== "S" && maze[r][c] !== "E") {
+        maze[r][c] = ".";
+      }
+
+      if (animate) {
+        setStatus("DFS", metrics.nodesVisited);
+        renderMaze();
+        await sleep(ANIMATION_DELAY_MS);
+      }
+
+      for (const [dr, dc] of directions) {
+        const nr = r + dr;
+        const nc = c + dc;
+
+        if (isValid(nr, nc)) {
+          parent[nr][nc] = { r, c };
+          if (await dfsVisit(nr, nc, end, metrics, depth + 1, animate)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    async function runDFS(animate = true) {
+      const metrics = {
+        found: false,
+        nodesVisited: 0,
+        pathLength: -1,
+        peakStructure: 0,
+        elapsedMs: 0
+      };
+
+      const start = findCell("S");
+      const end = findCell("E");
+      if (!start || !end) return metrics;
+
+      const begin = performance.now();
+      metrics.found = await dfsVisit(start.r, start.c, end, metrics, 1, animate);
+      metrics.elapsedMs = performance.now() - begin;
+
+      if (metrics.found) {
+        metrics.pathLength = reconstructPath(start, end);
+      }
+
+      if (animate) {
+        setStatus("DFS", metrics.nodesVisited);
+        renderMaze();
+      }
+
+      return metrics;
+    }
+
+    async function runBFS(animate = true) {
+      const metrics = {
+        found: false,
+        nodesVisited: 0,
+        pathLength: -1,
+        peakStructure: 0,
+        elapsedMs: 0
+      };
+
+      const start = findCell("S");
+      const end = findCell("E");
+      if (!start || !end) return metrics;
+
+      const queue = [start];
+      let front = 0;
+      visited[start.r][start.c] = true;
+      metrics.peakStructure = 1;
+
+      const begin = performance.now();
+
+      while (front < queue.length) {
+        const curr = queue[front++];
+        metrics.nodesVisited++;
+
+        if (samePoint(curr, end)) {
+          metrics.found = true;
+          break;
+        }
+
+        if (maze[curr.r][curr.c] !== "S" && maze[curr.r][curr.c] !== "E") {
+          maze[curr.r][curr.c] = ".";
+        }
+
+        if (animate) {
+          setStatus("BFS", metrics.nodesVisited);
+          renderMaze();
+          await sleep(ANIMATION_DELAY_MS);
+        }
+
+        for (const [dr, dc] of directions) {
+          const nr = curr.r + dr;
+          const nc = curr.c + dc;
+
+          if (isValid(nr, nc)) {
+            visited[nr][nc] = true;
+            parent[nr][nc] = { ...curr };
+            queue.push({ r: nr, c: nc });
+            metrics.peakStructure = Math.max(metrics.peakStructure, queue.length - front);
+          }
+        }
+      }
+
+      metrics.elapsedMs = performance.now() - begin;
+
+      if (metrics.found) {
+        metrics.pathLength = reconstructPath(start, end);
+      }
+
+      if (animate) {
+        setStatus("BFS", metrics.nodesVisited);
+        renderMaze();
+      }
+
+      return metrics;
+    }
+
+    function resultCards(name, m) {
+      const structureLabel = name === "DFS" ? "Max DFS depth" : "Max BFS queue";
+      return `
+        <h2>${name} Result</h2>
+        <div class="metrics">
+          <div class="metric"><small>Path found</small><strong>${m.found ? "YES" : "NO"}</strong></div>
+          <div class="metric"><small>Explored nodes</small><strong>${m.nodesVisited}</strong></div>
+          <div class="metric"><small>Path length</small><strong>${m.found ? m.pathLength + " moves" : "-1"}</strong></div>
+          <div class="metric"><small>Elapsed time</small><strong>${m.elapsedMs.toFixed(3)} ms</strong></div>
+          <div class="metric"><small>${structureLabel}</small><strong>${m.peakStructure}</strong></div>
+        </div>
+      `;
+    }
+
+    function snapshotMaze() {
+      return maze.map(row => [...row]);
+    }
+
+    function restoreMaze(snapshot) {
+      maze = snapshot.map(row => [...row]);
+      resetSearchOnly();
+    }
+
+    function blockAllEntrancesToEnd() {
+      const end = findCell("E");
+      if (!end) return;
+
+      for (const [dr, dc] of directions) {
+        const nr = end.r + dr;
+        const nc = end.c + dc;
+        if (isInside(nr, nc) && maze[nr][nc] !== "#" && maze[nr][nc] !== "S") {
+          maze[nr][nc] = "#";
+        }
+      }
+    }
+
+    async function runVisualization(type) {
+      if (running) return;
+      setRunning(true);
+      resetState();
+      renderMaze();
+      resultEl.innerHTML = "Running visualization...";
+
+      const metrics = type === "DFS" ? await runDFS(true) : await runBFS(true);
+      resultEl.innerHTML = resultCards(type, metrics);
+      setRunning(false);
+    }
+
+    async function compareAlgorithms() {
+      if (running) return;
+      setRunning(true);
+      resultEl.innerHTML = "Running comparison...";
+
+      resetState();
+      const dfs = await runDFS(false);
+
+      resetState();
+      const bfs = await runBFS(false);
+
+      renderMaze();
+      setStatus("Comparison", bfs.nodesVisited);
+
+      resultEl.innerHTML = `
+        <h2>BFS vs DFS Comparison</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Metric</th><th>DFS</th><th>BFS</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Path found</td><td>${dfs.found ? "YES" : "NO"}</td><td>${bfs.found ? "YES" : "NO"}</td></tr>
+              <tr><td>Explored nodes</td><td>${dfs.nodesVisited}</td><td>${bfs.nodesVisited}</td></tr>
+              <tr><td>Path length</td><td>${dfs.found ? dfs.pathLength : -1}</td><td>${bfs.found ? bfs.pathLength : -1}</td></tr>
+              <tr><td>Elapsed time (ms)</td><td>${dfs.elapsedMs.toFixed(3)}</td><td>${bfs.elapsedMs.toFixed(3)}</td></tr>
+              <tr><td>Peak structure</td><td>${dfs.peakStructure}</td><td>${bfs.peakStructure}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <strong>Analysis:</strong><br>
+          • BFS guarantees a shortest path in this unweighted maze.<br>
+          • DFS can find a valid path, but it does not guarantee the shortest one.<br>
+          • Explored-node count depends on neighbor order and maze structure.<br>
+          • Peak structure means recursion depth for DFS and queue size for BFS.
+        </div>
+      `;
+
+      setRunning(false);
+    }
+
+    async function testUnreachable() {
+      if (running) return;
+      setRunning(true);
+      resetState();
+      blockAllEntrancesToEnd();
+      renderMaze();
+      resultEl.innerHTML = "Testing unreachable target...";
+
+      const metrics = await runBFS(true);
+      resultEl.innerHTML = `
+        <h2>${!metrics.found ? "EDGE CASE PASSED" : "Unexpected result"}</h2>
+        <p>${!metrics.found ? "Target is unreachable; no path exists." : "A path was found."}</p>
+        ${resultCards("BFS", metrics)}
+      `;
+      setRunning(false);
+    }
+
+    document.getElementById("dfsBtn").addEventListener("click", () => runVisualization("DFS"));
+    document.getElementById("bfsBtn").addEventListener("click", () => runVisualization("BFS"));
+    document.getElementById("compareBtn").addEventListener("click", compareAlgorithms);
+    document.getElementById("unreachableBtn").addEventListener("click", testUnreachable);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      if (running) return;
+      resetState();
+      renderMaze();
+      setStatus("Ready", 0);
+      resultEl.innerHTML = "Maze reset. Choose an option above to start.";
+    });
+
+    resetState();
+    renderMaze();
+  </script>
+</body>
+</html>
